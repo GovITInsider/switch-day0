@@ -29,8 +29,8 @@ Generated configurations contain passwords and keys. Keep port 8001 on the engin
 #### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/GovITInsider/switch-day-0.git
-cd switch-day-0
+git clone https://github.com/GovITInsider/switch-day0.git
+cd switch-day0
 ```
 
 #### 2. Run the Installation Script
