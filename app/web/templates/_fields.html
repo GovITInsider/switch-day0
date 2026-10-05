@@ -1,0 +1,45 @@
+{% for section in schema.sections %}
+<section class="panel">
+  <h2>{{ section.title }}</h2>
+  <div class="grid">
+    {% for field in section.fields %}
+    {% set outer = "div" if field.type == "choices" else "label" %}
+    <{{ outer }} id="field-{{ field.name }}" class="field {% if field.multiline or field.type == 'choices' %}wide{% endif %} {% if field_errors.get(field.name) %}invalid{% endif %}"
+           {% if field.show_field %}data-show-field="{{ field.show_field }}" data-show-value="{{ field.show_value }}"{% endif %}>
+      <span>{{ field.label }}{% if field.requirement != "optional" and field.name not in stored_secret_names %} <i>Required</i>{% endif %}</span>
+      {% if field.help %}<small>{{ field.help }}</small>{% endif %}
+      {% if field.type == "bool" %}
+      <select name="{{ field.name }}">
+        <option value="yes" {% if values[field.name] == "yes" %}selected{% endif %}>Yes</option>
+        <option value="no" {% if values[field.name] != "yes" %}selected{% endif %}>No</option>
+      </select>
+      {% elif field.type == "choice" %}
+      <select name="{{ field.name }}">
+        <option value="choose"{% if not values[field.name] or values[field.name] == "choose" %} selected{% endif %}>Choose One</option>
+        {% for choice in field.choices if choice.value != "choose" %}
+        <option value="{{ choice.value }}" {% if values[field.name] == choice.value %}selected{% endif %}>{{ choice.label }}</option>
+        {% endfor %}
+      </select>
+      {% elif field.type == "choices" %}
+      <div class="checks">
+        {% for choice in field.choices if choice.value != "choose" %}
+        <label class="checkline">
+          <input type="checkbox" name="{{ field.name }}" value="{{ choice.value }}" {% if choice.value in values[field.name] %}checked{% endif %}>
+          {{ choice.label }}
+        </label>
+        {% endfor %}
+      </div>
+      {% elif field.multiline %}
+      <textarea name="{{ field.name }}" rows="4" spellcheck="false">{{ values[field.name] }}</textarea>
+      {% elif field.type == "password" %}
+      <input name="{{ field.name }}" type="password" autocomplete="new-password" value="{{ values[field.name] }}" {% if field.name in stored_secret_names and not values[field.name] %}placeholder="Stored key"{% endif %}>
+      {% if field.name in stored_secret_names and not values[field.name] %}<small>Leave blank to use the stored key. Type a value to override it for this switch only.</small>{% endif %}
+      {% else %}
+      <input name="{{ field.name }}" value="{{ values[field.name] }}" spellcheck="false" {% if field.type == "hostname" %}autocapitalize="off"{% endif %}{% if field.type == "interface_range" %} placeholder="GigabitEthernet1/0/1 - 48"{% endif %}>
+      {% endif %}
+      {% if field_errors.get(field.name) %}<em class="err">{{ field_errors[field.name] }}</em>{% endif %}
+    </{{ outer }}>
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}

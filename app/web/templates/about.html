@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="doc">
+  <h1>About Switch Day-0</h1>
+  <p class="lede">A web app for Cisco switch day-0 configuration.</p>
+  <p class="meta">Version 1.0</p>
+
+  <section class="panel">
+    <h2>What is Switch Day-0?</h2>
+    <p>An engineer picks an approved template, fills in the form, and copies the rendered IOS-XE text into the switch CLI. The server does not store the generated configuration.</p>
+    <p>Drafts stay off the generate page until an approver locks them. Revising a locked template opens a new draft and leaves the locked copy in place.</p>
+  </section>
+
+  <section class="panel">
+    <h2>MIT License</h2>
+    <p><strong>Copyright 2026 Ryan M Johns (@GovITInsider)</strong></p>
+    <p>Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:</p>
+    <p>The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.</p>
+    <p>THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</p>
+    <p><a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">Open Source Initiative</a></p>
+  </section>
+
+  <section class="panel">
+    <h2>Technology</h2>
+    <ul>
+      <li>Python + FastAPI</li>
+      <li>SQLite</li>
+      <li>Jinja2 templates</li>
+      <li>Uvicorn</li>
+    </ul>
+  </section>
+</div>
+{% endblock %}

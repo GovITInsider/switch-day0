@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<p class="eyebrow">Workflow{% if draft %} · draft revision {{ workflow.version }}{% else %} · locked revision {{ workflow.version }}{% endif %}</p>
+<h1>{{ workflow.name }}</h1>
+<p class="lede">{{ workflow.description }}</p>
+{% if draft %}
+<p class="flash warn">This preview is a draft. The generate page keeps using the locked workflow.</p>
+{% endif %}
+<section class="panel" id="workflow-templates">
+  <h2>Templates</h2>
+  {% if attachments %}
+  <p>Follow the directions below before you select and run a template.</p>
+  <ul class="rows">
+    {% for item in attachments %}
+    <li>
+      <div>
+        <strong>{{ item.name }}</strong>
+        {% if item.retired %}<p class="meta">Retired. This template is off the generate page.</p>{% elif not item.available %}<p class="meta">This template is not on the generate page.</p>{% endif %}
+      </div>
+      {% if item.available %}
+      <a class="button" href="/generate/{{ item.template_id }}{% if not draft %}?workflow={{ workflow.workflow_id }}{% endif %}">Open template</a>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>This workflow has no templates.</p>
+  {% endif %}
+</section>
+<article class="workflow">{{ body_html | safe }}</article>
+{% if draft %}
+<p><a href="/workshop/workflows/revisions/{{ workflow.id }}">Back to the draft</a></p>
+{% else %}
+<p><a href="/">Back to generate</a></p>
+{% endif %}
+{% endblock %}

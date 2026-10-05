@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<p class="eyebrow">Revision {{ revision.version }} · {{ revision.status }}</p>
+<h1>{{ revision.name }}</h1>
+<p class="lede">{{ revision.description }}</p>
+<p class="meta">Submitted {{ revision.submitted_at | when }} by {{ revision.submitted_by_username or revision.created_by_username }}</p>
+{% if revision.review_note %}
+<p class="flash warn">Last note: {{ revision.review_note }}</p>
+{% endif %}
+<section class="panel">
+  <h2>Instructions</h2>
+  <pre class="diff">{{ instructions_diff }}</pre>
+  <h2>Template changes</h2>
+  <pre class="diff">{{ body_diff }}</pre>
+  <h2>Configuration paste</h2>
+  <pre class="diff">{{ config_paste_diff }}</pre>
+  <h2>Form changes</h2>
+  <pre class="diff">{{ schema_diff }}</pre>
+  <h2>Follow-up commands</h2>
+  <pre class="diff">{{ follow_diff }}</pre>
+  <h2>Paste blocks</h2>
+  <pre class="diff">{{ paste_diff }}</pre>
+</section>
+<p><a href="/workshop/revisions/{{ revision.id }}/preview">Fill the form and preview a sample</a></p>
+{% if user.at_least("approver") and revision.status == "pending" %}
+<div class="actions">
+  <form method="post" action="/workshop/revisions/{{ revision.id }}/approve">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit">Approve and lock</button>
+  </form>
+  <form method="post" action="/workshop/revisions/{{ revision.id }}/send-back" class="stack grow">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>What should change?
+      <input name="note" required placeholder="Short note for the editor">
+    </label>
+    <button type="submit" class="secondary">Send back</button>
+  </form>
+  <form method="post" action="/workshop/revisions/{{ revision.id }}/reject" class="stack" data-confirm="Reject this revision? It will not be locked. A template already on the generate page stays there.">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Why reject this revision?
+      <input name="note" required placeholder="Short note for the history">
+    </label>
+    <button type="submit" class="danger">Reject</button>
+  </form>
+</div>
+{% elif revision.status == "pending" %}
+<p class="flash warn">This revision is waiting for an approver.</p>
+{% else %}
+<p><a href="/workshop/revisions/{{ revision.id }}">Back to the draft</a></p>
+{% endif %}
+{% endblock %}

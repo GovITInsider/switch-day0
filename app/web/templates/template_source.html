@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<p class="eyebrow">{{ revision.platform or "Cisco IOS-XE" }} · locked revision {{ revision.version }}</p>
+<h1>{{ revision.name }}</h1>
+<p class="lede">This is the locked template text. It is not filled in, and it is not pasted into the switch.</p>
+<p class="meta"><a href="/generate/{{ revision.template_id }}">Back to the form</a></p>
+<section class="panel">
+  <h2>{{ revision.config_title or "Main configuration" }}</h2>
+  <pre class="diff">{{ revision.body }}</pre>
+</section>
+{% for block in paste_blocks %}
+<section class="panel">
+  <h2>{{ block.title }}</h2>
+  <pre class="diff">{{ block.body }}</pre>
+</section>
+{% endfor %}
+<section class="panel">
+  <h2>{{ revision.follow_up_title or "Follow-up commands" }}</h2>
+  {% if revision.follow_up %}
+  <pre class="diff">{{ revision.follow_up }}</pre>
+  {% else %}
+  <p>No follow-up commands.</p>
+  {% endif %}
+</section>
+{% endblock %}

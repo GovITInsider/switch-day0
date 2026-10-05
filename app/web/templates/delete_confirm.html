@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ title }}</h1>
+<p class="lede">{{ message }}</p>
+{% if blocked %}
+<ul>
+  {% for reason in reasons %}<li>{{ reason }}</li>{% endfor %}
+</ul>
+<p><a href="/workshop">Back to workshop</a></p>
+{% else %}
+<form method="post" action="{{ action }}" class="stack">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <p>This cannot be recovered.</p>
+  <div class="actions">
+    <button type="submit" class="danger">Delete for good</button>
+    <a class="button secondary" href="/workshop">Cancel</a>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

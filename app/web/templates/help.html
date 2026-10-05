@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="doc">
+  <h1>Help</h1>
+  <p class="lede">How to generate a day-0 configuration and how a template becomes the one engineers use.</p>
+  <p class="meta">Version 1.0</p>
+
+  <section>
+    <h2>On this page</h2>
+    <ul>
+      <li><a href="#generate">Generate a configuration</a></li>
+      <li><a href="#workshop">Workshop</a></li>
+      <li><a href="#syntax">Template syntax</a></li>
+      <li><a href="#approval">Approval</a></li>
+      <li><a href="#retire">Retire and roll back</a></li>
+      <li><a href="#accounts">Accounts</a></li>
+      <li><a href="#secrets">Stored keys</a></li>
+    </ul>
+  </section>
+
+  <section id="generate">
+    <h2>Generate a configuration</h2>
+    <p>Open <strong>Generate</strong>. Workflows are listed above the templates. Open a workflow for the procedure and the templates it uses. Open a template to fill in the form. The rendered IOS-XE text is shown so you can copy it into the switch CLI. The server does not save that text.</p>
+    <p><strong>View raw template</strong>, under the template name, shows the locked template text. It is not filled in.</p>
+    <p>Some templates start with instructions. Read them before filling in the fields. After the configuration is generated, the same instructions stay above the paste. They are not part of the configuration or the downloaded file.</p>
+    <p>A dropdown starts on <strong>Choose One</strong>. Pick a listed value. The configuration is not generated while that prompt is still selected.</p>
+    <p>Some templates split the configuration into paste blocks. Paste the main configuration, then each block in order. Each block is its own copy. Each copy box can have a title and a short note. The note is shown above that paste and left out of the download. A blank main title is shown as <strong>Configuration</strong>. A blank note adds nothing.</p>
+    <p>A paste can be marked <strong>Console</strong>, <strong>SSH</strong>, or <strong>Pause</strong>. The word appears beside that heading, and the paste changes color. The mark is left out of the paste and the downloaded file.</p>
+    <p>Follow-up commands, when the template has any, appear in their own box after the pastes. They use the same fields. A blank follow-up is omitted, and the downloaded file leaves it out. A blank follow-up title is shown as <strong>Run these separately</strong>.</p>
+    <p>Generated configurations contain passwords and keys. Keep this site on the engineering network.</p>
+  </section>
+
+  <section id="workshop">
+    <h2>Workshop</h2>
+    <p>Editors and approvers use <strong>Workshop</strong> to change the standards. Operators do not.</p>
+    <ul>
+      <li><strong>New template</strong> starts a draft. It stays off the generate page until an approver locks it.</li>
+      <li><strong>New workflow</strong> starts a draft page. Attach the locked templates it uses, write the page, and submit it. Operators see a locked workflow above the templates. Revise leaves the locked page in place.</li>
+      <li><strong>Revise</strong> on a locked template opens a new draft and leaves the locked copy in place. Engineers keep generating from the locked copy while the draft is in progress.</li>
+      <li><strong>Duplicate</strong> on a locked template opens a new draft with the same fields and commands. The locked template stays as it is. Give the copy its own name before you submit it.</li>
+      <li>Save a draft, preview it, then submit it. A submitted revision waits under <strong>Waiting for approval</strong>.</li>
+      <li><strong>Cancel</strong> deletes the draft. Nothing is sent for review. A locked template stays as it is.</li>
+      <li><strong>Download backup</strong> saves the locked and retired templates. <strong>Import backup</strong> puts that file back. An approver does both from Workshop. Drafts are not in the file.</li>
+      <li>An <strong>interface range</strong> field is a Cisco range such as <code>GigabitEthernet1/0/1 - 48</code>. Up to five ranges can be separated by commas.</li>
+      <li><strong>Move up</strong> and <strong>Move down</strong> change the order of fields in a section, and the order of the sections. The generate form follows that order.</li>
+      <li>A <strong>choices</strong> field is a checkbox list, up to 40 rows, written as <code>value | label</code>. Nothing starts checked. The template loops over the checked rows.</li>
+    </ul>
+  </section>
+
+  <section id="syntax">
+    <h2>Template syntax</h2>
+    <p>The main configuration, each paste block, and the follow-up commands can use the fields on the form. A name that is not a field is refused. Templates cannot include other files.</p>
+    <p>Write a field in double braces:</p>
+    <pre class="syntax">hostname {{ '{{ hostname }}' }}</pre>
+    <p>An empty optional field is blank, so this skips the line when NTP server 1 is empty:</p>
+    <pre class="syntax">{% raw %}{% if ntp_server_1 %}
+ntp server {{ ntp_server_1 }}
+{% endif %}{% endraw %}</pre>
+    <p>Chain other cases with <code>{% raw %}{% elif %}{% endraw %}</code> and <code>{% raw %}{% else %}{% endraw %}</code>. Close the block with <code>{% raw %}{% endif %}{% endraw %}</code>. The same test can sit inside one line. Several fields can be combined with <code>or</code>:</p>
+    <pre class="syntax">{% raw %}{% if timezone == "UTC" %}
+clock timezone UTC 0 0
+{% elif timezone == "Eastern" %}
+clock timezone EST -5 0
+{% else %}
+clock timezone PST -8 0
+{% endif %}
+aaa group server tacacs+ {% if mgmt_path == "oob" %}MGMT-TACACS{% else %}TACACS{% endif %}
+{% if tacacs_server_1 or tacacs_server_2 %}
+aaa new-model
+{% endif %}{% endraw %}</pre>
+    <p>A yes/no field is the text <code>yes</code> or <code>no</code>. Both are filled in, so compare it with <code>yes</code>:</p>
+    <pre class="syntax">{% raw %}{% if snmp_enabled == "yes" %}
+snmp-server community {{ snmp_community }} RO
+{% endif %}{% endraw %}</pre>
+    <p>A choices field is a list. The engineer checks any number of rows, and nothing starts checked. The template loops over the checked rows in the order they are written. Each row has <code>value</code> and <code>label</code>. At most 40 rows.</p>
+    <pre class="syntax">{% raw %}{% for vlan in user_vlans %}
+vlan {{ vlan.value }}
+ name {{ vlan.label }}
+{% endfor %}
+{% if user_vlans %}
+interface {{ uplink_interface }}
+ switchport trunk allowed vlan {{ mgmt_vlan }}{% for vlan in user_vlans %},{{ vlan.value }}{% endfor %}
+{% endif %}{% endraw %}</pre>
+    <p>A choices field can be shown, or made required, from another field. Another field cannot be shown or made required from which rows are checked. Required when any listed field is filled can see that the list is not empty.</p>
+    <p>A loop can also split a multiline field into lines:</p>
+    <pre class="syntax">{% raw %}{% for line in banner_text.splitlines() %}
+{{ line }}
+{% endfor %}{% endraw %}</pre>
+    <p>A comment is left out of the paste:</p>
+    <pre class="syntax">{% raw %}{# Kept for the next editor. Not pasted. #}{% endraw %}</pre>
+    <p>A run of blank lines in the result becomes one blank line.</p>
+  </section>
+
+  <section id="approval">
+    <h2>Approval</h2>
+    <p>An approver opens <strong>Review</strong> on a submitted revision and compares it with the locked template.</p>
+    <ul>
+      <li><strong>Approve and lock</strong> puts that revision on the generate page. The previous locked revision is kept in the history.</li>
+      <li><strong>Send back</strong> returns it to the editor with a note.</li>
+      <li><strong>Reject</strong> closes the revision so it is never locked. A short reason is required. A template already on the generate page stays there. The reason remains on the <strong>Rejected</strong> list and in the template history.</li>
+    </ul>
+  </section>
+
+  <section id="retire">
+    <h2>Retire and roll back</h2>
+    <p><strong>Retire</strong> takes a locked template off the generate page. <strong>Restore</strong> puts it back. Retire does not delete the template or its history. Workflows work the same way.</p>
+    <p>An admin can <strong>Delete</strong> a retired template or workflow, or a rejected revision, when nothing else is attached. A draft, a revision waiting for approval, someone editing it, or a workflow that still lists the template keeps it in place, and the workshop says why. The confirmation page says the delete cannot be recovered. A rejected change to a template or workflow that is still locked or retired stays in the list.</p>
+    <p><strong>Roll back</strong> on the history page locks an older revision again. The revision that was locked becomes an archived revision.</p>
+    <p>The sample template is added when the app starts and the database has no templates.</p>
+  </section>
+
+  <section id="accounts">
+    <h2>Accounts</h2>
+    <p>The app holds at most 10 accounts. An admin adds accounts, resets passwords, removes accounts, and assigns roles from <strong>Users</strong>. At least one admin has to remain.</p>
+    <p>Any signed-in user can change their own password from <strong>Password</strong>.</p>
+    <ul>
+      <li><strong>Operator</strong> — generate configuration from locked templates.</li>
+      <li><strong>Editor</strong> — also create drafts, preview them, and submit them.</li>
+      <li><strong>Approver</strong> — also lock a draft, send it back, reject it, retire, restore, and roll back.</li>
+      <li><strong>Admin</strong> — also manage the accounts, the stored keys, and permanent deletion of retired or rejected templates and workflows that have nothing else attached.</li>
+    </ul>
+  </section>
+
+  <section id="secrets">
+    <h2>Stored keys</h2>
+    <p>An admin stores shared secrets on the <strong>Secrets</strong> page. Each one has a name and a field name. A new database starts with four unset names that match the sample template: <code>local_secret</code>, <code>enable_secret</code>, <code>config_key</code>, and <code>tacacs_key</code>. Add, rename, or remove names for the templates you use. The page holds at most 8. The values are not written into the template.</p>
+    <p>On the generate form, a password field whose name matches a stored secret shows <strong>Stored key</strong> in gray while it is empty and the secret has a value. Leave it blank to use the stored value. Type a different value to use that for this switch only. The typed value is not saved.</p>
+  </section>
+</div>
+{% endblock %}

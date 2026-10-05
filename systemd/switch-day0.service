@@ -1,0 +1,17 @@
+[Unit]
+Description=Switch Day-0 configuration generator
+After=network.target
+
+[Service]
+Type=simple
+User=switchday0
+Group=switchday0
+WorkingDirectory=/opt/switch-day0
+Environment=PATH=/opt/switch-day0/venv/bin
+EnvironmentFile=-/opt/switch-day0/.env
+ExecStart=/opt/switch-day0/venv/bin/python -m uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8001
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

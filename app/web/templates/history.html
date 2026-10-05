@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<p class="eyebrow">{{ template.platform }}{% if template.retired %} · retired{% endif %}</p>
+<h1>Revision history</h1>
+<ul class="rows">
+  {% for revision in revisions %}
+  <li>
+    <div>
+      <strong>{{ revision.name }}</strong>
+      <span class="pill {{ revision.status }}">Revision {{ revision.version }} · {{ revision.status }}</span>
+      <p class="meta">Updated {{ revision.updated_at | when }}
+        {% if revision.reviewed_by_username %} · reviewed by {{ revision.reviewed_by_username }} {{ revision.reviewed_at | when }}{% endif %}
+      </p>
+      {% if revision.review_note %}<p>{{ revision.review_note }}</p>{% endif %}
+    </div>
+    <div class="row-actions">
+      {% if revision.status == "draft" %}
+      <a href="/workshop/revisions/{{ revision.id }}">Edit</a>
+      {% elif revision.status == "pending" %}
+      <a href="/workshop/revisions/{{ revision.id }}/review">Review</a>
+      {% endif %}
+      {% if revision.status == "archived" and user.at_least("approver") %}
+      <form method="post" action="/workshop/revisions/{{ revision.id }}/rollback" data-confirm="Lock revision {{ revision.version }} again? The current locked revision becomes archived.">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="secondary">Roll back to this</button>
+      </form>
+      {% endif %}
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+<p><a href="/workshop">Back to workshop</a></p>
+{% endblock %}

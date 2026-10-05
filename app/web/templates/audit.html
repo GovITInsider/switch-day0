@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Activity</h1>
+<p class="lede">Approvals, drafts, and account changes. Generated configurations and passwords are not recorded.</p>
+{% if events %}
+<table>
+  <thead>
+    <tr><th>When</th><th>Who</th><th>What</th></tr>
+  </thead>
+  <tbody>
+    {% for event in events %}
+    <tr>
+      <td>{{ event.at | when }}</td>
+      <td>{{ event.username }}</td>
+      <td>{{ event.detail }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No activity yet.</p>
+{% endif %}
+{% endblock %}

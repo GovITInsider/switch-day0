@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="titlebar">
+  <div>
+    <h1>Workshop</h1>
+    <p class="lede">Drafts stay off the generate page until an approver locks them.</p>
+  </div>
+  <a class="button" href="/workshop/new">New template</a>
+</div>
+
+<section>
+  <h2>Waiting for approval</h2>
+  {% if pending %}
+  <ul class="rows">
+    {% for item in pending %}
+    <li>
+      <div>
+        <strong>{{ item.name }}</strong>
+        <span class="pill pending">Revision {{ item.version }}</span>
+        <p class="meta">Submitted {{ item.submitted_at | when }} by {{ item.submitted_by_username }}</p>
+      </div>
+      <a href="/workshop/revisions/{{ item.revision_id }}/review">Review</a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">Nothing is waiting.</p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Drafts</h2>
+  {% if drafts %}
+  <ul class="rows">
+    {% for item in drafts %}
+    <li>
+      <div>
+        <strong>{{ item.name }}</strong>
+        <span class="pill draft">Revision {{ item.version }}</span>
+        <p class="meta">Updated {{ item.updated_at | when }} by {{ item.created_by_username }}</p>
+      </div>
+      <a href="/workshop/revisions/{{ item.revision_id }}">Edit</a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">No drafts.</p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Locked templates</h2>
+  {% if live %}
+  <ul class="rows">
+    {% for item in live %}
+    <li>
+      <div>
+        <strong>{{ item.name }}</strong>
+        <span class="pill live">Revision {{ item.version }}</span>
+        <p>{{ item.description }}</p>
+        <p class="meta">{{ item.platform }} · locked {{ item.updated_at | when }} by {{ item.reviewed_by_username }}</p>
+      </div>
+      <div class="row-actions">
+        <a href="/generate/{{ item.template_id }}">Generate</a>
+        <a href="/workshop/templates/{{ item.template_id }}">History</a>
+        <form method="post" action="/workshop/templates/{{ item.template_id }}/revise">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="secondary">Revise</button>
+        </form>
+        <form method="post" action="/workshop/templates/{{ item.template_id }}/duplicate">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="secondary">Duplicate</button>
+        </form>
+        {% if user.at_least("approver") %}
+        <form method="post" action="/workshop/templates/{{ item.template_id }}/retire" data-confirm="Retire this template? Engineers will no longer be able to generate from it.">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="danger">Retire</button>
+        </form>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">No locked templates.</p>
+  {% endif %}
+</section>
+
+<section>
+  <details class="fold">
+    <summary><h2>Retired{% if retired %} ({{ retired|length }}){% endif %}</h2></summary>
+    {% if retired %}
+    <ul class="rows">
+      {% for item in retired %}
+      <li>
+        <div>
+          <strong>{{ item.name }}</strong>
+          <span class="pill retired">Revision {{ item.version }}</span>
+          <p class="meta">Off the generate page</p>
+        </div>
+        <div class="row-actions">
+          <a href="/workshop/templates/{{ item.template_id }}">History</a>
+          {% if user.at_least("approver") %}
+          <form method="post" action="/workshop/templates/{{ item.template_id }}/restore">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button type="submit" class="secondary">Restore</button>
+          </form>
+          {% endif %}
+          {% if user.at_least("admin") %}
+          {% if item.delete_reasons %}
+          <p class="err">This cannot be deleted yet. {{ item.delete_reasons | join(" ") }}</p>
+          {% else %}
+          <a href="/workshop/templates/{{ item.template_id }}/delete">Delete</a>
+          {% endif %}
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty">Nothing retired.</p>
+    {% endif %}
+  </details>
+</section>
+
+<section>
+  <details class="fold">
+    <summary><h2>Rejected{% if rejected %} ({{ rejected|length }}){% endif %}</h2></summary>
+    {% if rejected %}
+    <ul class="rows">
+      {% for item in rejected %}
+      <li>
+        <div>
+          <strong>{{ item.name }}</strong>
+          <span class="pill rejected">Revision {{ item.version }}</span>
+          {% if item.review_note %}<p>{{ item.review_note }}</p>{% endif %}
+          <p class="meta">Rejected {{ item.reviewed_at | when }} by {{ item.reviewed_by_username }}</p>
+          {% if user.at_least("admin") and item.delete_reasons %}
+          <p class="err">This cannot be deleted yet. {{ item.delete_reasons | join(" ") }}</p>
+          {% endif %}
+        </div>
+        <div class="row-actions">
+          <a href="/workshop/templates/{{ item.template_id }}">History</a>
+          {% if user.at_least("admin") and not item.delete_reasons %}
+          <a href="/workshop/revisions/{{ item.revision_id }}/delete">Delete</a>
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty">Nothing rejected.</p>
+    {% endif %}
+  </details>
+</section>
+
+<section id="workflows">
+  <div class="titlebar">
+    <h2>Workflows</h2>
+    <a class="button" href="/workshop/workflows/new">New workflow</a>
+  </div>
+  <p>A workflow is one page of instructions and the templates that page uses. It stays off the generate page until an approver locks it.</p>
+  {% if workflow_pending %}
+  <h3>Waiting for approval</h3>
+  <ul class="rows">
+    {% for item in workflow_pending %}
+    <li>
+      <div>
+        <strong>{{ item.name }}</strong>
+        <span class="pill pending">Revision {{ item.version }}</span>
+        <p class="meta">Submitted {{ item.submitted_at | when }} by {{ item.submitted_by_username }}</p>
+      </div>
+      <a href="/workshop/workflows/revisions/{{ item.revision_id }}/review">Review</a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% if workflow_drafts %}
+  <h3>Drafts</h3>
+  <ul class="rows">
+    {% for item in workflow_drafts %}
+    <li>
+      <div>
+        <strong>{{ item.name }}</strong>
+        <span class="pill draft">Revision {{ item.version }}</span>
+        <p class="meta">Updated {{ item.updated_at | when }} by {{ item.created_by_username }}</p>
+      </div>
+      <a href="/workshop/workflows/revisions/{{ item.revision_id }}">Edit</a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <h3>Locked</h3>
+  {% if workflow_live %}
+  <ul class="rows">
+    {% for item in workflow_live %}
+    <li>
+      <div>
+        <strong>{{ item.name }}</strong>
+        <span class="pill live">Revision {{ item.version }}</span>
+        <p>{{ item.description }}</p>
+      </div>
+      <div class="row-actions">
+        <a href="/workflows/{{ item.workflow_id }}">Open</a>
+        <a href="/workshop/workflows/{{ item.workflow_id }}">History</a>
+        <form method="post" action="/workshop/workflows/{{ item.workflow_id }}/revise">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="secondary">Revise</button>
+        </form>
+        {% if user.at_least("approver") %}
+        <form method="post" action="/workshop/workflows/{{ item.workflow_id }}/retire" data-confirm="Retire this workflow? Engineers will no longer see it on the generate page.">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit" class="danger">Retire</button>
+        </form>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">No locked workflows.</p>
+  {% endif %}
+  {% if workflow_retired %}
+  <details class="fold">
+    <summary><h3>Retired ({{ workflow_retired|length }})</h3></summary>
+    <ul class="rows">
+      {% for item in workflow_retired %}
+      <li>
+        <div>
+          <strong>{{ item.name }}</strong>
+          <span class="pill retired">Revision {{ item.version }}</span>
+          <p class="meta">Off the generate page</p>
+        </div>
+        <div class="row-actions">
+          <a href="/workshop/workflows/{{ item.workflow_id }}">History</a>
+          {% if user.at_least("approver") %}
+          <form method="post" action="/workshop/workflows/{{ item.workflow_id }}/restore">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button type="submit" class="secondary">Restore</button>
+          </form>
+          {% endif %}
+          {% if user.at_least("admin") %}
+          {% if item.delete_reasons %}
+          <p class="err">This cannot be deleted yet. {{ item.delete_reasons | join(" ") }}</p>
+          {% else %}
+          <a href="/workshop/workflows/{{ item.workflow_id }}/delete">Delete</a>
+          {% endif %}
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+  {% if workflow_rejected %}
+  <details class="fold">
+    <summary><h3>Rejected ({{ workflow_rejected|length }})</h3></summary>
+    <ul class="rows">
+      {% for item in workflow_rejected %}
+      <li>
+        <div>
+          <strong>{{ item.name }}</strong>
+          <span class="pill rejected">Revision {{ item.version }}</span>
+          {% if item.review_note %}<p>{{ item.review_note }}</p>{% endif %}
+          {% if user.at_least("admin") and item.delete_reasons %}
+          <p class="err">This cannot be deleted yet. {{ item.delete_reasons | join(" ") }}</p>
+          {% endif %}
+        </div>
+        <div class="row-actions">
+          <a href="/workshop/workflows/{{ item.workflow_id }}">History</a>
+          {% if user.at_least("admin") and not item.delete_reasons %}
+          <a href="/workshop/workflows/revisions/{{ item.revision_id }}/delete">Delete</a>
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+</section>
+
+{% if user.at_least("approver") %}
+<section class="panel" id="backup">
+  <h2>Backup</h2>
+  <p>Download the locked and retired templates and the locked workflows. On a rebuilt system, import that file to put them back. A template or workflow already here is updated when its origin matches, or when it has no origin and the locked name matches. Anything missing from the file is left in place. Drafts and revisions waiting for approval are left out. An open draft stops the import.</p>
+  <div class="actions">
+    <a class="button" href="/workshop/templates/export">Download backup</a>
+  </div>
+  <form method="post" action="/workshop/templates/import" enctype="multipart/form-data" class="stack" data-confirm="Import this backup? Matching templates and workflows are replaced. An open draft stops the import.">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Backup file
+      <input type="file" name="backup" accept=".json,application/json" required>
+    </label>
+    <button type="submit">Import backup</button>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block content %}
+<p class="eyebrow">{{ revision.platform or "Cisco IOS-XE" }}{% if draft %} · draft revision {{ revision.version }}{% else %} · locked revision {{ revision.version }}{% endif %}</p>
+<h1>{{ revision.name }}</h1>
+{% if not draft %}<p class="meta"><a href="/generate/{{ revision.template_id }}/template">View raw template</a></p>{% endif %}
+{% if workflow %}<p class="meta"><a href="/workflows/{{ workflow.workflow_id }}">Back to {{ workflow.name }}</a></p>{% endif %}
+<p class="lede">{{ revision.description }}</p>
+<p class="month-line">{{ month_line }}</p>
+{% if draft %}
+<p class="flash warn">This preview is a draft. The generate page keeps using the locked template.</p>
+{% endif %}
+{% if instructions %}
+<section class="panel" id="instructions">
+  <h2>Instructions</h2>
+  <div class="instructions">{{ instructions }}</div>
+</section>
+{% endif %}
+{% if field_errors %}
+<section class="panel" id="form-errors">
+  <h2>The configuration was not generated</h2>
+  {% if field_errors.get("_form") %}<p class="flash error">{{ field_errors["_form"] }}</p>{% endif %}
+  <ul>
+    {% for key, message in field_errors.items() %}
+    {% if key != "_form" %}<li><a href="#field-{{ key }}">{{ message }}</a></li>{% endif %}
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% if config %}
+<section class="panel result" id="result">
+  <div class="paste{% if config_mark %} mark-{{ config_mark }}{% endif %}">
+    <h2>{{ config_title or "Configuration" }}{% if config_mark == "console" %} <span class="paste-mark">Console</span>{% elif config_mark == "ssh" %} <span class="paste-mark">SSH</span>{% elif config_mark == "pause" %} <span class="paste-mark">Pause</span>{% endif %}</h2>
+    <p class="secret-note">This page is not stored. It contains passwords and keys. Clear the clipboard after you paste.</p>
+    {% if config_note %}<p class="paste-note">{{ config_note }}</p>{% endif %}
+    <div class="copybar">
+      <button type="button" data-copy="paste-block"{% if config_mark %} class="mark-{{ config_mark }}"{% endif %}>Select {{ config_title or "configuration" }}</button>
+    </div>
+    <textarea id="paste-block" readonly spellcheck="false">{{ config }}</textarea>
+  </div>
+  {% for block in paste_blocks %}
+  <div class="paste{% if block.mark %} mark-{{ block.mark }}{% endif %}">
+    <h2>{{ block.title }}{% if block.mark == "console" %} <span class="paste-mark">Console</span>{% elif block.mark == "ssh" %} <span class="paste-mark">SSH</span>{% elif block.mark == "pause" %} <span class="paste-mark">Pause</span>{% endif %}</h2>
+    {% if block.note %}<p class="paste-note">{{ block.note }}</p>{% endif %}
+    <div class="copybar">
+      <button type="button" data-copy="{{ block.dom_id }}"{% if block.mark %} class="mark-{{ block.mark }}"{% endif %}>Select {{ block.title }}</button>
+    </div>
+    <textarea id="{{ block.dom_id }}" class="paste-block" readonly spellcheck="false">{{ block.text }}</textarea>
+  </div>
+  {% endfor %}
+  {% if follow_up %}
+  <div class="paste{% if follow_up_mark %} mark-{{ follow_up_mark }}{% endif %}">
+    <h2>{{ follow_up_title or "Run these separately" }}{% if follow_up_mark == "console" %} <span class="paste-mark">Console</span>{% elif follow_up_mark == "ssh" %} <span class="paste-mark">SSH</span>{% elif follow_up_mark == "pause" %} <span class="paste-mark">Pause</span>{% endif %}</h2>
+    {% if follow_up_note %}
+    <p class="paste-note">{{ follow_up_note }}</p>
+    {% endif %}
+    <div class="copybar">
+      <button type="button" data-copy="follow-up"{% if follow_up_mark %} class="mark-{{ follow_up_mark }}"{% endif %}>Select {{ follow_up_title or "follow-up commands" }}</button>
+    </div>
+    <textarea id="follow-up" readonly spellcheck="false">{{ follow_up }}</textarea>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+<form method="post" action="{% if draft %}/workshop/revisions/{{ revision.id }}/preview{% else %}/generate/{{ revision.template_id }}{% endif %}" class="stack" data-switch-form>
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {% if workflow %}<input type="hidden" name="workflow" value="{{ workflow.workflow_id }}">{% endif %}
+  {% include "_fields.html" %}
+  <div class="actions">
+    <button type="submit">{% if draft %}Preview configuration{% else %}Generate configuration{% endif %}</button>
+    {% if not draft %}
+    <button type="submit" class="secondary" formaction="/generate/{{ revision.template_id }}/download">Download .cfg</button>
+    {% endif %}
+  </div>
+</form>
+{% endblock %}

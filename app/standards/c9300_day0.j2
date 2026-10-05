@@ -1,0 +1,181 @@
+{# Catalyst 9300 IOS-XE day-0 bootstrap. Approved text is what engineers paste. #}
+configure terminal
+!
+hostname {{ hostname }}
+ip domain name {{ domain_name }}
+no ip domain lookup
+!
+service timestamps debug datetime msec localtime show-timezone
+service timestamps log datetime msec localtime show-timezone
+service password-encryption
+no ip source-route
+!
+key config-key password-encrypt {{ config_key }}
+password encryption aes
+!
+{% if timezone == "UTC" %}
+clock timezone UTC 0 0
+{% elif timezone == "Eastern" %}
+clock timezone EST -5 0
+clock summer-time EDT recurring
+{% elif timezone == "Central" %}
+clock timezone CST -6 0
+clock summer-time CDT recurring
+{% elif timezone == "Mountain" %}
+clock timezone MST -7 0
+clock summer-time MDT recurring
+{% elif timezone == "Arizona" %}
+clock timezone MST -7 0
+{% elif timezone == "Pacific" %}
+clock timezone PST -8 0
+clock summer-time PDT recurring
+{% endif %}
+!
+username {{ local_username }} privilege 15 secret 0 {{ local_secret }}
+enable secret 0 {{ enable_secret }}
+!
+{% if mgmt_path == "oob" %}
+vrf definition Mgmt-vrf
+ address-family ipv4
+ exit-address-family
+!
+interface GigabitEthernet0/0
+ description MANAGEMENT
+ vrf forwarding Mgmt-vrf
+ ip address {{ mgmt_ip }} {{ mgmt_mask }}
+ no shutdown
+!
+ip route vrf Mgmt-vrf 0.0.0.0 0.0.0.0 {{ mgmt_gateway }}
+{% elif mgmt_path == "svi" %}
+vlan {{ mgmt_vlan }}
+ name MANAGEMENT
+!
+interface {{ uplink_interface }}
+ description DAY0-MGMT-UPLINK
+ switchport mode access
+ switchport access vlan {{ mgmt_vlan }}
+ switchport nonegotiate
+ no shutdown
+!
+interface Vlan{{ mgmt_vlan }}
+ description MANAGEMENT
+ ip address {{ mgmt_ip }} {{ mgmt_mask }}
+ no shutdown
+!
+ip default-gateway {{ mgmt_gateway }}
+{% endif %}
+!
+aaa new-model
+{% if tacacs_server_1 or tacacs_server_2 %}
+{% if tacacs_server_1 %}
+tacacs server TACACS1
+ address ipv4 {{ tacacs_server_1 }}
+ key 0 {{ tacacs_key }}
+ timeout 5
+!
+{% endif %}
+{% if tacacs_server_2 %}
+tacacs server TACACS2
+ address ipv4 {{ tacacs_server_2 }}
+ key 0 {{ tacacs_key }}
+ timeout 5
+!
+{% endif %}
+aaa group server tacacs+ {% if mgmt_path == "oob" %}MGMT-TACACS{% else %}TACACS{% endif %}
+{% if tacacs_server_1 %}
+ server name TACACS1
+{% endif %}
+{% if tacacs_server_2 %}
+ server name TACACS2
+{% endif %}
+{% if mgmt_path == "oob" %}
+ ip vrf forwarding Mgmt-vrf
+ ip tacacs source-interface GigabitEthernet0/0
+{% else %}
+ ip tacacs source-interface Vlan{{ mgmt_vlan }}
+{% endif %}
+!
+aaa authentication login default group {% if mgmt_path == "oob" %}MGMT-TACACS{% else %}TACACS{% endif %} local
+aaa authentication enable default group {% if mgmt_path == "oob" %}MGMT-TACACS{% else %}TACACS{% endif %} enable
+aaa authorization exec default group {% if mgmt_path == "oob" %}MGMT-TACACS{% else %}TACACS{% endif %} local
+aaa accounting exec default start-stop group {% if mgmt_path == "oob" %}MGMT-TACACS{% else %}TACACS{% endif %}
+{% else %}
+aaa authentication login default local
+aaa authentication enable default enable
+aaa authorization exec default local
+{% endif %}
+!
+{% if ntp_server_1 %}
+{% if mgmt_path == "oob" %}
+ntp server vrf Mgmt-vrf {{ ntp_server_1 }}
+{% else %}
+ntp server {{ ntp_server_1 }}
+{% endif %}
+{% endif %}
+{% if ntp_server_2 %}
+{% if mgmt_path == "oob" %}
+ntp server vrf Mgmt-vrf {{ ntp_server_2 }}
+{% else %}
+ntp server {{ ntp_server_2 }}
+{% endif %}
+{% endif %}
+{% if syslog_server_1 %}
+{% if mgmt_path == "oob" %}
+logging host {{ syslog_server_1 }} vrf Mgmt-vrf
+{% else %}
+logging host {{ syslog_server_1 }}
+{% endif %}
+{% endif %}
+{% if syslog_server_2 %}
+{% if mgmt_path == "oob" %}
+logging host {{ syslog_server_2 }} vrf Mgmt-vrf
+{% else %}
+logging host {{ syslog_server_2 }}
+{% endif %}
+{% endif %}
+{% if mgmt_path == "oob" %}
+logging source-interface GigabitEthernet0/0 vrf Mgmt-vrf
+logging buffered 32000 informational
+snmp-server source-interface traps GigabitEthernet0/0
+{% else %}
+logging source-interface Vlan{{ mgmt_vlan }}
+logging buffered 32000 informational
+snmp-server source-interface traps Vlan{{ mgmt_vlan }}
+{% endif %}
+!
+ip ssh version 2
+ip ssh time-out 60
+no ip http server
+no ip http secure-server
+!
+snmp-server location {{ location }}
+snmp-server contact {{ contact }}
+{% if snmp_community %}
+snmp-server community {{ snmp_community }} RO
+{% endif %}
+!
+{% if banner_text %}
+banner motd ^
+{{ banner_text }}
+^
+!
+{% endif %}
+vtp mode transparent
+spanning-tree mode rapid-pvst
+spanning-tree extend system-id
+!
+line con 0
+ logging synchronous
+ login authentication default
+ authorization exec default
+ exec-timeout 15 0
+!
+line vty 0 15
+ logging synchronous
+ login authentication default
+ authorization exec default
+ exec-timeout 15 0
+ transport preferred none
+ transport input ssh
+!
+end

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Generate a configuration</h1>
+<p class="lede full">{% if workflows %}Start with a workflow, or open a locked template and copy the result into the CLI.{% else %}Pick a locked template, fill in the switch, and copy the result into the CLI.{% endif %}</p>
+<p class="month-line full">{{ month_line }}</p>
+{% if workflows %}
+<section>
+  <h2>Workflows</h2>
+  <div class="cards">
+    {% for item in workflows %}
+    <a class="card" href="/workflows/{{ item.workflow_id }}">
+      <p class="eyebrow">Workflow</p>
+      <h2>{{ item.name }}</h2>
+      <p>{{ item.description }}</p>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+<section>
+  {% if workflows %}<h2>Templates</h2>{% endif %}
+  {% if catalog %}
+  <div class="cards">
+    {% for item in catalog %}
+    <a class="card" href="/generate/{{ item.template_id }}">
+      <p class="eyebrow">{{ item.platform }} · revision {{ item.version }}</p>
+      <h2>{{ item.name }}</h2>
+      <p>{{ item.description }}</p>
+      <p class="meta">Locked {{ item.reviewed_at | when }} by {{ item.reviewed_by_username }}</p>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="panel">
+    <p>No approved templates are available. An approver can restore one from the workshop.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

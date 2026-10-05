@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+<p class="eyebrow">{% if version %}Revision {{ version }}{% else %}New workflow{% endif %}</p>
+<h1>{% if revision_id %}Edit workflow{% else %}New workflow{% endif %}</h1>
+<p class="lede">One page for the procedure. Attach the locked templates that page uses. The workflow stays off the generate page until an approver locks it.</p>
+{% if review_note %}<p class="flash warn">Sent back: {{ review_note }}</p>{% endif %}
+{% if lock_message %}<p class="flash warn">{{ lock_message }}</p>{% endif %}
+{% if errors %}
+<section class="panel">
+  <h2>Fix these before saving</h2>
+  <ul>{% for message in errors %}<li>{{ message }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+<form id="workflow-form" method="post" action="{% if revision_id %}/workshop/workflows/revisions/{{ revision_id }}{% else %}/workshop/workflows/new{% endif %}" class="stack">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label>Name
+    <input name="workflow_name" value="{{ workflow_name }}" required>
+  </label>
+  <label>Description
+    <input name="workflow_description" value="{{ workflow_description }}" required>
+    <small>Shown on the workflow card. One or two sentences.</small>
+  </label>
+  <section class="panel stack">
+    <h2>Templates</h2>
+    <p class="meta">These buttons appear at the top of the page, in this order. A workflow can have none. At most {{ max_templates }}.</p>
+    <div id="workflow-templates" class="stack">
+      {% for template_id in template_ids %}
+      <div class="inline" data-workflow-template>
+        <select name="workflow_template">
+          <option value="">Choose a template</option>
+          {% for choice in template_choices %}
+          <option value="{{ choice.id }}" {% if choice.id == template_id %}selected{% endif %}>{{ choice.name }}{% if choice.retired %} (retired){% endif %}</option>
+          {% endfor %}
+        </select>
+        <button type="button" class="secondary" data-move-workflow="up">Move up</button>
+        <button type="button" class="secondary" data-move-workflow="down">Move down</button>
+        <button type="button" class="ghost" data-remove-workflow>Remove</button>
+      </div>
+      {% endfor %}
+    </div>
+    <p><button type="button" class="secondary" id="add-workflow-template" data-max="{{ max_templates }}">Add template</button></p>
+  </section>
+  <label>Page
+    <textarea name="workflow_body" rows="18" spellcheck="true">{{ workflow_body }}</textarea>
+    <small>Use # for a heading, - for a list, **bold**, `code`, and a link written as [text](https://example.com). A fence of ``` holds a command the engineer reads. The page does not fill in fields.</small>
+  </label>
+  {% if lock_message %}
+  <label class="checkline"><input type="checkbox" name="save_anyway" value="yes"> Save anyway and overwrite the other editor</label>
+  {% endif %}
+  <div class="actions">
+    <button type="submit" name="action" value="save">Save draft</button>
+    <button type="submit" name="action" value="preview" class="secondary">Save and preview</button>
+    <button type="submit" name="action" value="submit" class="secondary">Save and submit</button>
+    {% if revision_id %}
+    <button type="submit" class="ghost" form="discard-workflow">Cancel</button>
+    {% else %}
+    <a class="button ghost" href="/workshop" data-confirm="Leave without saving this workflow?">Cancel</a>
+    {% endif %}
+  </div>
+  <p id="workflow-status" class="meta" role="status"></p>
+</form>
+{% if revision_id %}
+<form id="discard-workflow" method="post" action="/workshop/workflows/revisions/{{ revision_id }}/discard" data-confirm="Discard this draft? It is deleted, and nothing is sent for review.">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+</form>
+{% endif %}
+<template id="workflow-template-row">
+  <div class="inline" data-workflow-template>
+    <select name="workflow_template">
+      <option value="">Choose a template</option>
+      {% for choice in template_choices %}
+      <option value="{{ choice.id }}">{{ choice.name }}{% if choice.retired %} (retired){% endif %}</option>
+      {% endfor %}
+    </select>
+    <button type="button" class="secondary" data-move-workflow="up">Move up</button>
+    <button type="button" class="secondary" data-move-workflow="down">Move down</button>
+    <button type="button" class="ghost" data-remove-workflow>Remove</button>
+  </div>
+</template>
+{% endblock %}

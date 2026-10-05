@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+{% macro field_card(section_index, field) %}
+<div class="field-card" data-field>
+  <input type="hidden" name="field_section" value="{{ section_index }}" data-section-index>
+  <div class="titlebar">
+    <button type="button" class="ghost" data-move-field="up">Move up</button>
+    <button type="button" class="ghost" data-move-field="down">Move down</button>
+  </div>
+  <div class="grid">
+    <label>Label
+      <input name="field_label" value="{{ field.label }}" required>
+    </label>
+    <label>Variable name
+      <input name="field_name" value="{{ field.name }}" spellcheck="false" required>
+    </label>
+    <label>Type
+      <select name="field_type" data-type>
+        {% for kind in field_types %}
+        <option value="{{ kind }}" {% if field.type == kind %}selected{% endif %}>{{ field_type_labels[kind] }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Requirement
+      <select name="field_requirement" data-requirement>
+        <option value="optional" {% if field.requirement == "optional" %}selected{% endif %}>Optional</option>
+        <option value="required" {% if field.requirement == "required" %}selected{% endif %}>Required</option>
+        <option value="equals" {% if field.requirement == "equals" %}selected{% endif %}>Required when a field equals</option>
+        <option value="any" {% if field.requirement == "any" %}selected{% endif %}>Required when any field is filled</option>
+      </select>
+    </label>
+    <label>Default
+      <input name="field_default" value="{{ field.default }}">
+    </label>
+    <label class="wide">Help
+      <input name="field_help" value="{{ field.help }}">
+    </label>
+  </div>
+  <div class="grid" data-text-flags>
+    <label>Multi-line
+      <select name="field_multiline">
+        <option value="no" {% if not field.multiline %}selected{% endif %}>No</option>
+        <option value="yes" {% if field.multiline %}selected{% endif %}>Yes</option>
+      </select>
+    </label>
+    <label>One word
+      <select name="field_token">
+        <option value="no" {% if not field.token %}selected{% endif %}>No</option>
+        <option value="yes" {% if field.token %}selected{% endif %}>Yes</option>
+      </select>
+    </label>
+  </div>
+  <label data-choices>Choices, one per line, as value | label
+    <textarea name="field_choices" rows="4" spellcheck="false">{{ choice_lines(field.choices) }}</textarea>
+    <small data-choice-hint {% if field.type == 'choices' %}hidden{% endif %}>The generate form starts on Choose One. Leave the default blank. The configuration is not generated until a listed value is selected.</small>
+    <small data-choices-hint {% if field.type != 'choices' %}hidden{% endif %}>The engineer checks any number of these. Nothing starts checked. Leave the default blank. At most 40 rows. In the template, loop over the field. Each checked row has value and label, in this order.</small>
+  </label>
+  <div class="grid" data-when-equals>
+    <label>When variable
+      <input name="field_when_field" value="{{ field.when_field }}">
+    </label>
+    <label>Equals
+      <input name="field_when_value" value="{{ field.when_value }}">
+    </label>
+  </div>
+  <label data-when-any>Required when any of these variables are filled
+    <input name="field_when_list" value="{{ field.when_fields | join(', ') }}" placeholder="tacacs_server_1, tacacs_server_2">
+  </label>
+  <div class="grid">
+    <label>Show when variable
+      <input name="field_show_field" value="{{ field.show_field }}" placeholder="optional">
+    </label>
+    <label>Equals
+      <input name="field_show_value" value="{{ field.show_value }}">
+    </label>
+  </div>
+  <button type="button" class="ghost" data-remove-field>Remove field</button>
+</div>
+{% endmacro %}
+{% macro paste_mark_field(field_name, selected) %}
+<label>Mark
+  <select name="{{ field_name }}">
+    {% for value, label in paste_marks %}
+    <option value="{{ value }}"{% if (selected or '') == value %} selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <small>Optional. Colors this paste and shows the word beside its heading. The mark stays out of the paste and the downloaded file.</small>
+</label>
+{% endmacro %}
+{% block content %}
+<p class="eyebrow">{% if version %}Revision {{ version }}{% else %}New template{% endif %}</p>
+<h1>{% if revision_id %}Edit draft{% else %}New template{% endif %}</h1>
+<div class="help panel">
+  <p>Use a field in the template as <code>{{ '{{ hostname }}' }}</code>. A yes/no field is the text <code>yes</code> or <code>no</code>, so compare it with <code>yes</code>. An empty optional field is blank, so <code>{% raw %}{% if ntp_server_1 %}{% endraw %}</code> skips that line. An interface range is a Cisco range such as <code>GigabitEthernet1/0/1 - 48</code>. Up to five ranges can be separated by commas. Put that field after <code>interface range</code>, for example <code>interface range {{ '{{ access_ports }}' }}</code>. Instructions are for the engineer. They are shown on the form and above the generated configuration, and they are not pasted into the switch. Templates cannot include other files. Paste blocks and follow-up commands use the same fields. Follow-up commands are pasted after the main configuration and any paste blocks. <a href="/help#syntax">Help</a> has the template syntax.</p>
+</div>
+{% if review_note %}
+<p class="flash warn">Sent back: {{ review_note }}</p>
+{% endif %}
+{% if lock_message %}
+<p class="flash warn">{{ lock_message }}</p>
+{% endif %}
+{% if errors %}
+<div class="flash error" role="alert">
+  {% for message in errors %}<p>{{ message }}</p>{% endfor %}
+</div>
+{% endif %}
+<form method="post" action="{% if revision_id %}/workshop/revisions/{{ revision_id }}{% else %}/workshop/new{% endif %}" class="stack" id="editor-form">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="hidden" name="schema_checks" value="{{ checks_json }}">
+  <section class="panel grid">
+    <label>Template name
+      <input name="template_name" value="{{ template_name }}" required>
+    </label>
+    <label class="wide">When to use it
+      <textarea name="template_description" rows="3" required>{{ description }}</textarea>
+    </label>
+    <label class="wide">Instructions for the engineer
+      <textarea name="template_instructions" rows="10">{{ instructions }}</textarea>
+      <small>Optional. Shown above the fields, and above the configuration after it is generated. Up to 50 lines. This text is not pasted into the switch.</small>
+    </label>
+    {% if schema.checks %}
+    <label class="wide checkline">
+      <input type="checkbox" name="keep_checks" value="yes" checked>
+      Keep the saved check that the gateway sits in the management subnet.
+    </label>
+    {% endif %}
+  </section>
+  <div id="sections">
+    {% set ns = namespace(section_index=0) %}
+    {% for section in schema.sections %}
+    {% set ns.section_index = loop.index0 %}
+    <section class="panel" data-section>
+      <div class="titlebar">
+        <label>Section
+          <input name="section_title" value="{{ section.title }}" required>
+        </label>
+        <button type="button" class="ghost" data-move-section="up">Move up</button>
+        <button type="button" class="ghost" data-move-section="down">Move down</button>
+        <button type="button" class="ghost" data-remove-section>Remove section</button>
+      </div>
+      <div data-fields>
+        {% for field in section.fields %}
+        {{ field_card(ns.section_index, field) }}
+        {% endfor %}
+      </div>
+      <button type="button" class="secondary" data-add-field>Add field</button>
+    </section>
+    {% endfor %}
+  </div>
+  <p><button type="button" class="secondary" id="add-section">Add section</button></p>
+  <section class="panel stack">
+    <h2>Main configuration</h2>
+    <label>Paste title
+      <input name="config_title" value="{{ config_title }}">
+      <small>Optional. Shown as the heading of the main copy box. A blank title keeps "Configuration".</small>
+    </label>
+    {{ paste_mark_field("config_mark", config_mark) }}
+    <label>Paste note
+      <textarea name="config_note" rows="3">{{ config_note }}</textarea>
+      <small>Optional. Up to three lines, shown under that heading. The note stays out of the paste and the downloaded file.</small>
+    </label>
+    <label>IOS-XE template
+      <textarea name="body" rows="24" spellcheck="false" class="code">{{ body }}</textarea>
+    </label>
+  </section>
+  <div id="paste-blocks">
+    {% for block in paste_blocks %}
+    <section class="panel stack" data-paste-block>
+      <div class="titlebar">
+        <label>Paste block
+          <input name="paste_title" value="{{ block.title }}" required>
+        </label>
+        <button type="button" class="ghost" data-remove-paste-block>Remove paste block</button>
+      </div>
+      {{ paste_mark_field("paste_mark", block.mark) }}
+      <label>Note
+        <textarea name="paste_note" rows="3">{{ block.note }}</textarea>
+        <small>Optional. Up to three lines, shown under this block's heading. The note stays out of the paste.</small>
+      </label>
+      <label>Commands
+        <textarea name="paste_body" rows="10" spellcheck="false" class="code">{{ block.body }}</textarea>
+      </label>
+    </section>
+    {% endfor %}
+  </div>
+  <p><button type="button" class="secondary" id="add-paste-block" data-max="{{ max_paste_blocks }}">Add paste block</button></p>
+  <p class="meta">Optional, up to {{ max_paste_blocks }}. Paste each block on its own after the main configuration and before the follow-up commands. A block does not enter or leave configuration mode for you.</p>
+  <section class="panel stack">
+    <label>Follow-up title
+      <input name="follow_up_title" value="{{ follow_up_title }}">
+      <small>Optional. A blank title keeps "Run these separately".</small>
+    </label>
+    {{ paste_mark_field("follow_up_mark", follow_up_mark) }}
+    <label>Follow-up note
+      <textarea name="follow_up_note" rows="3">{{ follow_up_note }}</textarea>
+      <small>Optional. Up to three lines, shown under that heading. A blank note adds nothing.</small>
+    </label>
+    <label>Follow-up commands
+      <textarea name="follow_up" rows="6" spellcheck="false" class="code">{{ follow_up }}</textarea>
+    </label>
+    <p class="meta">Paste these after the main configuration and any paste blocks. Leave the commands blank when the template has none.</p>
+  </section>
+  {% if lock_message %}
+  <label class="checkline"><input type="checkbox" name="save_anyway" value="yes"> Save anyway and overwrite the other editor</label>
+  {% endif %}
+  <div class="actions">
+    <button type="submit" name="action" value="save">Save draft</button>
+    <button type="submit" name="action" value="preview" class="secondary">Save and preview</button>
+    <button type="submit" name="action" value="submit" class="secondary">Save and submit</button>
+    {% if revision_id %}
+    <button type="submit" class="ghost" form="discard-form">Cancel</button>
+    {% else %}
+    <a class="button ghost" href="/workshop" data-confirm="Leave without saving this template?">Cancel</a>
+    {% endif %}
+  </div>
+  <p id="editor-status" class="meta" role="status"></p>
+</form>
+{% if revision_id %}
+<form id="discard-form" method="post" action="/workshop/revisions/{{ revision_id }}/discard" data-confirm="Discard this draft? It is deleted, and nothing is sent for review.">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+</form>
+{% endif %}
+
+<template id="field-template">
+  {{ field_card(0, {"label": "", "name": "", "type": "text", "requirement": "required", "default": "", "help": "", "multiline": false, "token": false, "choices": [], "when_field": "", "when_value": "", "when_fields": [], "show_field": "", "show_value": ""}) }}
+</template>
+<template id="paste-block-template">
+  <section class="panel stack" data-paste-block>
+    <div class="titlebar">
+      <label>Paste block
+        <input name="paste_title" value="" required>
+      </label>
+      <button type="button" class="ghost" data-remove-paste-block>Remove paste block</button>
+    </div>
+    {{ paste_mark_field("paste_mark", "") }}
+    <label>Note
+      <textarea name="paste_note" rows="3"></textarea>
+      <small>Optional. Up to three lines, shown under this block's heading. The note stays out of the paste.</small>
+    </label>
+    <label>Commands
+      <textarea name="paste_body" rows="10" spellcheck="false" class="code"></textarea>
+    </label>
+  </section>
+</template>
+<template id="section-template">
+  <section class="panel" data-section>
+    <div class="titlebar">
+      <label>Section
+        <input name="section_title" value="General" required>
+      </label>
+      <button type="button" class="ghost" data-move-section="up">Move up</button>
+      <button type="button" class="ghost" data-move-section="down">Move down</button>
+      <button type="button" class="ghost" data-remove-section>Remove section</button>
+    </div>
+    <div data-fields></div>
+    <button type="button" class="secondary" data-add-field>Add field</button>
+  </section>
+</template>
+{% endblock %}

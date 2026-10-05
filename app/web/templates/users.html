@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Users</h1>
+<p class="lede">{{ people | length }} of {{ max_users }} accounts. Any account can hold any role. At least one admin has to remain.</p>
+{% if people | length < max_users %}
+<section class="panel">
+  <h2>Add an account</h2>
+  <form method="post" action="/users" class="grid">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Username
+      <input name="username" required autocomplete="off" spellcheck="false">
+    </label>
+    <label>Password
+      <input name="password" type="password" required autocomplete="new-password">
+    </label>
+    <label>Role
+      <select name="role">
+        {% for role in roles %}
+        <option value="{{ role }}">{{ role_labels[role] }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <div class="actions"><button type="submit">Add user</button></div>
+  </form>
+</section>
+{% else %}
+<p class="flash warn">The team is at the 10 account limit. Remove one to add another.</p>
+{% endif %}
+<ul class="rows">
+  {% for person in people %}
+  <li>
+    <div>
+      <strong>{{ person.username }}</strong>
+      <span class="pill live">{{ role_labels[person.role] }}</span>
+      <p class="meta">Added {{ person.created_at | when }}</p>
+    </div>
+    <div class="row-actions wrap">
+      <form method="post" action="/users/{{ person.id }}/role" class="inline">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <select name="role">
+          {% for role in roles %}
+          <option value="{{ role }}" {% if person.role == role %}selected{% endif %}>{{ role_labels[role] }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="secondary">Set role</button>
+      </form>
+      <form method="post" action="/users/{{ person.id }}/password" class="inline">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input name="password" type="password" placeholder="New password" autocomplete="new-password" required>
+        <button type="submit" class="secondary">Reset password</button>
+      </form>
+      {% if person.id != user.id %}
+      <form method="post" action="/users/{{ person.id }}/delete" data-confirm="Remove {{ person.username }}?">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="danger">Remove</button>
+      </form>
+      {% endif %}
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% endblock %}
