@@ -1559,6 +1559,92 @@ def test_the_generate_page_can_show_the_raw_template(tmp_path, monkeypatch):
     assert admin.get("/generate/999/template").status_code == 404
 
 
+def test_the_raw_template_downloads_as_a_text_file(tmp_path, monkeypatch):
+    app = _app(tmp_path, monkeypatch)
+    anon = TestClient(app)
+    blocked = anon.get("/generate/1/template.txt", follow_redirects=False)
+    assert blocked.status_code == 303
+    assert "/login" in blocked.headers["location"]
+
+    admin = TestClient(app)
+    login(admin)
+    page = admin.get("/generate/1/template")
+    assert 'href="/generate/1/template.txt"' in page.text
+    assert "Download .txt" in page.text
+    assert "<strong>Download .txt</strong>" in admin.get("/help").text
+
+    downloaded = admin.get("/generate/1/template.txt")
+    assert downloaded.status_code == 200
+    assert downloaded.headers["content-type"].startswith("text/plain")
+    assert 'filename="C9300-Day-0-Bootstrap.txt"' in downloaded.headers["content-disposition"]
+    text = downloaded.text
+    assert text.startswith(
+        "! Template: C9300 Day-0 Bootstrap\n! Locked revision 1\n! Raw template. Not filled in. Not a switch-day0 backup.\n"
+    )
+    assert "! Main configuration\n{# Catalyst 9300" in text
+    assert "hostname {{ hostname }}" in text
+    assert '{% if timezone == "UTC" %}' in text
+    assert "! Follow-up commands\ncrypto key generate rsa general-keys modulus 4096\nwrite memory\n" in text
+    assert text.index("hostname {{ hostname }}") < text.index("! Follow-up commands")
+    assert "SITE-IDF1-SW01" not in text
+    assert '"templates"' not in text
+    assert admin.get("/generate/999/template.txt").status_code == 404
+
+    admin.post(
+        "/users",
+        data={"csrf": csrf_from(admin.get("/users").text), "username": "casey", "password": "CaseyPass123", "role": "operator"},
+    )
+    operator = TestClient(app)
+    login(operator, "casey", "CaseyPass123")
+    copied = operator.get("/generate/1/template.txt")
+    assert copied.status_code == 200
+    assert copied.text == text
+
+    revised = admin.post(
+        "/workshop/templates/1/revise",
+        data={"csrf": csrf_from(admin.get("/workshop").text)},
+        follow_redirects=False,
+    )
+    editor_page = admin.get(revised.headers["location"])
+    visible = re.sub(r"<template[\s\S]*?</template>", "", editor_page.text)
+    payload = _editor_payload(csrf_from(editor_page.text), None)
+    body = re.search(r'<textarea name="body"[^>]*>(.*?)</textarea>', visible, re.S).group(1)
+    payload["body"] = html.unescape(body)
+    payload["config_title"] = "Day-0 configuration"
+    payload["follow_up_title"] = "Save the switch"
+    payload["paste_title"] = ["Interfaces"]
+    payload["paste_body"] = ["! second paste {{ hostname }}\n"]
+    payload["paste_note"] = ["Wait for the links."]
+    payload["paste_mark"] = ["ssh"]
+    submitted = admin.post(revised.headers["location"], data=payload, follow_redirects=False)
+    assert submitted.status_code == 303
+    review_link = re.search(r'href="(/workshop/revisions/\d+/review)"', admin.get("/workshop").text).group(1)
+    review = admin.get(review_link)
+    approved = admin.post(
+        review_link.replace("/review", "/approve"),
+        data={"csrf": csrf_from(review.text)},
+        follow_redirects=False,
+    )
+    assert approved.status_code == 303
+    filed = admin.get("/generate/1/template.txt")
+    assert filed.status_code == 200
+    assert 'filename="C9300-Day-0-Bootstrap.txt"' in filed.headers["content-disposition"]
+    assert "! Locked revision 2\n" in filed.text
+    assert "! Day-0 configuration\n" in filed.text
+    assert "! Interfaces\n! second paste {{ hostname }}\n" in filed.text
+    assert "! Save the switch\ncrypto key generate rsa general-keys modulus 4096\nwrite memory\n" in filed.text
+    assert "Wait for the links." not in filed.text
+    assert filed.text.index("! Day-0 configuration") < filed.text.index("! Interfaces") < filed.text.index("! Save the switch")
+    assert "hostname {{ hostname }}" in filed.text
+
+    admin.post(
+        "/workshop/templates/1/retire",
+        data={"csrf": csrf_from(admin.get("/workshop").text)},
+        follow_redirects=False,
+    )
+    assert admin.get("/generate/1/template.txt").status_code == 404
+
+
 def test_duplicate_opens_a_new_template(tmp_path, monkeypatch):
     admin = TestClient(_app(tmp_path, monkeypatch))
     login(admin)

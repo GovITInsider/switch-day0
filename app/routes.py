@@ -141,6 +141,31 @@ def _filename(values):
     return "%s-day0.cfg" % host
 
 
+def _raw_template_filename(name):
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", str(name or "").strip()).strip("-.")
+    return "%s.txt" % (cleaned or "template")
+
+
+def _raw_template_text(revision):
+    sections = [(revision.get("config_title") or "Main configuration", revision.get("body") or "")]
+    for block in paste_blocks_from_row(revision.get("paste_blocks")):
+        sections.append((block.get("title") or "Paste block", block.get("body") or ""))
+    follow_up = revision.get("follow_up") or ""
+    if follow_up.strip():
+        sections.append((revision.get("follow_up_title") or "Follow-up commands", follow_up))
+    lines = [
+        "! Template: %s" % revision["name"],
+        "! Locked revision %s" % revision["version"],
+        "! Raw template. Not filled in. Not a switch-day0 backup.",
+    ]
+    for title, body in sections:
+        heading = " ".join(str(title).split()) or "Section"
+        lines.append("")
+        lines.append("! %s" % heading)
+        lines.append(str(body).replace("\r\n", "\n").replace("\r", "\n").strip("\n"))
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def _diff(old, new, label):
     if old == new:
         return "%s has no changes." % label
@@ -314,6 +339,29 @@ def generate_template_source(request: Request, template_id: int):
         title=revision["name"],
         revision=revision,
         paste_blocks=paste_blocks_from_row(revision.get("paste_blocks")),
+    )
+
+
+@router.get("/generate/{template_id}/template.txt")
+def download_raw_template(request: Request, template_id: int):
+    require(request, "operator")
+    with db_session(request.app.state.settings) as conn:
+        revision = live_template(conn, template_id)
+    if revision is None:
+        return render_page(
+            request,
+            "error.html",
+            status=404,
+            title="Missing template",
+            message="That template is not available to generate.",
+        )
+    return Response(
+        content=_raw_template_text(revision),
+        media_type="text/plain; charset=utf-8",
+        headers={
+            "Content-Disposition": 'attachment; filename="%s"' % _raw_template_filename(revision["name"]),
+            "Cache-Control": "no-store",
+        },
     )
 
 

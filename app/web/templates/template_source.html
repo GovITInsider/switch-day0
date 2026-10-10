@@ -3,7 +3,10 @@
 <p class="eyebrow">{{ revision.platform or "Cisco IOS-XE" }} · locked revision {{ revision.version }}</p>
 <h1>{{ revision.name }}</h1>
 <p class="lede">This is the locked template text. It is not filled in, and it is not pasted into the switch.</p>
-<p class="meta"><a href="/generate/{{ revision.template_id }}">Back to the form</a></p>
+<div class="actions">
+  <a class="button" href="/generate/{{ revision.template_id }}/template.txt">Download .txt</a>
+  <a class="button ghost" href="/generate/{{ revision.template_id }}">Back to the form</a>
+</div>
 <section class="panel">
   <h2>{{ revision.config_title or "Main configuration" }}</h2>
   <pre class="diff">{{ revision.body }}</pre>
