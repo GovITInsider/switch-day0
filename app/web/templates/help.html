@@ -3,7 +3,7 @@
 <div class="doc">
   <h1>Help</h1>
   <p class="lede">How to generate a day-0 configuration and how a template becomes the one engineers use.</p>
-  <p class="meta">Version 1.0</p>
+  <p class="meta">Version 1.0.1</p>
 
   <section>
     <h2>On this page</h2>
@@ -24,6 +24,7 @@
     <p><strong>View raw template</strong>, under the template name, shows the locked template text. It is not filled in. <strong>Download .txt</strong> on that page saves the same text, including each paste block and the follow-up commands. That file is not the Workshop backup.</p>
     <p>Some templates start with instructions. Read them before filling in the fields. After the configuration is generated, the same instructions stay above the paste. They are not part of the configuration or the downloaded file.</p>
     <p>A dropdown starts on <strong>Choose One</strong>. Pick a listed value. The configuration is not generated while that prompt is still selected.</p>
+    <p>Changing a choice can hide fields. A hidden field keeps what you typed, so switching back shows it again. The configuration uses only the fields still on screen.</p>
     <p>Some templates split the configuration into paste blocks. Paste the main configuration, then each block in order. Each block is its own copy. Each copy box can have a title and a short note. The note is shown above that paste and left out of the download. A blank main title is shown as <strong>Configuration</strong>. A blank note adds nothing.</p>
     <p>A paste can be marked <strong>Console</strong>, <strong>SSH</strong>, or <strong>Pause</strong>. The word appears beside that heading, and the paste changes color. The mark is left out of the paste and the downloaded file.</p>
     <p>Follow-up commands, when the template has any, appear in their own box after the pastes. They use the same fields. A blank follow-up is omitted, and the downloaded file leaves it out. A blank follow-up title is shown as <strong>Run these separately</strong>.</p>
@@ -68,6 +69,7 @@ aaa group server tacacs+ {% if mgmt_path == "oob" %}MGMT-TACACS{% else %}TACACS{
 {% if tacacs_server_1 or tacacs_server_2 %}
 aaa new-model
 {% endif %}{% endraw %}</pre>
+    <p>A field that <strong>Show when</strong> hides is blank in the template. A hidden yes/no field is blank, not <code>no</code>. A hidden checkbox list is empty. The form still shows the typed value when the field is visible again.</p>
     <p>A yes/no field is the text <code>yes</code> or <code>no</code>. Both are filled in, so compare it with <code>yes</code>:</p>
     <pre class="syntax">{% raw %}{% if snmp_enabled == "yes" %}
 snmp-server community {{ snmp_community }} RO

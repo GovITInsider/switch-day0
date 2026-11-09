@@ -25,10 +25,22 @@ function renumber(form) {
 }
 
 function applySwitchVisibility(form) {
-  form.querySelectorAll("[data-show-field]").forEach(function (el) {
-    var control = form.querySelector('[name="' + CSS.escape(el.dataset.showField) + '"]');
-    el.hidden = !(control && control.value === el.dataset.showValue);
-  });
+  var changed = true;
+  var guard = 0;
+  while (changed && guard < 12) {
+    changed = false;
+    guard += 1;
+    form.querySelectorAll("[data-show-field]").forEach(function (el) {
+      var control = form.querySelector('[name="' + CSS.escape(el.dataset.showField) + '"]');
+      var controllerField = control ? control.closest("[data-show-field]") : null;
+      var controllerVisible = !controllerField || !controllerField.hidden;
+      var visible = !!(control && controllerVisible && control.value === el.dataset.showValue);
+      if (el.hidden === visible) {
+        el.hidden = !visible;
+        changed = true;
+      }
+    });
+  }
 }
 
 document.querySelectorAll("form[data-confirm]").forEach(function (form) {

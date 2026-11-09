@@ -3,6 +3,7 @@ from app.engine import render_body
 from app.schema import (
     apply_stored_secrets,
     clean_instructions,
+    render_values,
     clean_paste_note,
     instructions_error,
     parse_editor,
@@ -66,6 +67,183 @@ def test_vlan_and_uplink_are_required_only_for_the_in_band_path():
     )
     assert errors == {}
     assert cleaned["mgmt_vlan"] == "100"
+
+
+def _visibility_schema():
+    return {
+        "sections": [
+            {
+                "title": "Path",
+                "fields": [
+                    _listed_field(
+                        "mode",
+                        "choice",
+                        requirement="required",
+                        label="Mode",
+                        choices=[
+                            {"value": "on", "label": "On"},
+                            {"value": "off", "label": "Off"},
+                        ],
+                    ),
+                    _listed_field(
+                        "snmp_enabled",
+                        "bool",
+                        label="SNMP",
+                        show_field="mode",
+                        show_value="on",
+                    ),
+                    _listed_field(
+                        "user_vlans",
+                        "choices",
+                        label="User VLANs",
+                        show_field="mode",
+                        show_value="on",
+                    ),
+                    _listed_field(
+                        "child",
+                        "text",
+                        label="Child",
+                        show_field="snmp_enabled",
+                        show_value="yes",
+                    ),
+                    _listed_field(
+                        "note",
+                        "text",
+                        label="Note",
+                        requirement="equals",
+                        when_field="snmp_enabled",
+                        when_value="yes",
+                    ),
+                    _listed_field(
+                        "radius_key",
+                        "password",
+                        label="RADIUS key",
+                        show_field="mode",
+                        show_value="on",
+                    ),
+                ],
+            }
+        ],
+        "checks": [],
+    }
+
+
+def test_a_hidden_field_is_kept_for_the_form_and_blank_for_the_template():
+    cleaned, errors = validate_values(
+        seed_schema(),
+        values(mgmt_vlan="9999", uplink_interface="not an interface"),
+    )
+    assert errors == {}
+    assert cleaned["mgmt_vlan"] == "9999"
+    assert cleaned["uplink_interface"] == "not an interface"
+    rendered = render_values(seed_schema(), cleaned)
+    assert rendered["mgmt_vlan"] == ""
+    assert rendered["uplink_interface"] == ""
+    assert rendered["snmp_community"] == ""
+    text = render_body(
+        "{% if mgmt_vlan %}vlan {{ mgmt_vlan }}{% endif %}\n"
+        "{% if uplink_interface %}interface {{ uplink_interface }}{% endif %}\n",
+        rendered,
+    )
+    assert "vlan" not in text
+    assert "interface" not in text
+    shown, errors = validate_values(
+        seed_schema(),
+        values(mgmt_path="svi", mgmt_vlan="100", uplink_interface="GigabitEthernet1/0/48"),
+    )
+    assert errors == {}
+    text = render_body(
+        "{% if mgmt_vlan %}vlan {{ mgmt_vlan }}{% endif %}\n",
+        render_values(seed_schema(), shown),
+    )
+    assert text == "vlan 100\n"
+    filled, errors = validate_values(seed_schema(), values(snmp_community="monitor-ro"))
+    assert errors == {}
+    assert render_values(seed_schema(), filled)["snmp_community"] == "monitor-ro"
+
+
+def test_a_hidden_controller_hides_nested_fields_and_does_not_require_them():
+    schema = _visibility_schema()
+    hidden = {
+        "mode": "off",
+        "snmp_enabled": "yes",
+        "user_vlans": ["10", "999"],
+        "child": "bad^name",
+        "note": "",
+        "radius_key": "short",
+    }
+    cleaned, errors = validate_values(schema, hidden)
+    assert errors == {}
+    assert cleaned["snmp_enabled"] == "yes"
+    assert cleaned["user_vlans"] == ["10", "999"]
+    assert cleaned["child"] == "bad^name"
+    assert cleaned["radius_key"] == "short"
+    rendered = render_values(schema, cleaned)
+    assert rendered["snmp_enabled"] == ""
+    assert rendered["user_vlans"] == []
+    assert rendered["child"] == ""
+    assert rendered["radius_key"] == ""
+    filled = apply_stored_secrets(schema, rendered, {"radius_key": "RadiusKey123"})
+    assert filled["radius_key"] == ""
+
+    missing_note = {
+        "mode": "on",
+        "snmp_enabled": "yes",
+        "user_vlans": ["10"],
+        "child": "uplink",
+        "note": "",
+        "radius_key": "",
+    }
+    _, errors = validate_values(schema, missing_note)
+    assert "note" in errors
+    missing_note["note"] = "see ticket"
+    cleaned, errors = validate_values(schema, missing_note, {"radius_key"})
+    assert errors == {}
+    rendered = render_values(schema, cleaned)
+    assert rendered["snmp_enabled"] == "yes"
+    assert rendered["child"] == "uplink"
+    assert rendered["user_vlans"] == ["10"]
+    filled = apply_stored_secrets(schema, rendered, {"radius_key": "RadiusKey123"})
+    assert filled["radius_key"] == "RadiusKey123"
+
+    nested = {
+        "mode": "on",
+        "snmp_enabled": "no",
+        "user_vlans": [],
+        "child": "kept",
+        "note": "",
+        "radius_key": "",
+    }
+    cleaned, errors = validate_values(schema, nested)
+    assert errors == {}
+    assert cleaned["child"] == "kept"
+    assert render_values(schema, cleaned)["child"] == ""
+    assert render_values(schema, cleaned)["snmp_enabled"] == "no"
+
+
+def test_a_subnet_check_ignores_a_hidden_address():
+    schema = seed_schema()
+    for section in schema["sections"]:
+        for item in section["fields"]:
+            if item["name"] == "mgmt_gateway":
+                item["show_field"] = "mgmt_path"
+                item["show_value"] = "svi"
+                item["requirement"] = "equals"
+                item["when_field"] = "mgmt_path"
+                item["when_value"] = "svi"
+    _, quiet = validate_values(schema, values(mgmt_gateway="10.9.9.9"))
+    assert quiet == {}
+    assert render_values(schema, values(mgmt_gateway="10.9.9.9"))["mgmt_gateway"] == ""
+    _, errors = validate_values(
+        schema,
+        values(
+            mgmt_path="svi",
+            mgmt_vlan="100",
+            uplink_interface="GigabitEthernet1/0/48",
+            mgmt_gateway="10.9.9.9",
+        ),
+    )
+    assert "subnet" in errors["mgmt_gateway"]
 
 
 def test_a_blank_radius_key_uses_the_stored_secret():

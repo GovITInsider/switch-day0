@@ -28,6 +28,7 @@ from app.schema import (
     parse_editor,
     paste_blocks_from_row,
     paste_mark_label,
+    render_values,
     template_values,
     values_from_form,
 )
@@ -1576,7 +1577,10 @@ def _compose(request, revision, form, draft):
     paste_blocks = []
     if not errors:
         try:
-            rendered = template_values(schema, apply_stored_secrets(schema, values, secret_map))
+            rendered = template_values(
+                schema,
+                apply_stored_secrets(schema, render_values(schema, values), secret_map),
+            )
             config = render_config(revision["body"], rendered, _header(revision, draft=draft))
             paste_blocks = render_paste_blocks(paste_blocks_from_row(revision.get("paste_blocks")), rendered)
             follow_up = render_follow_up(revision.get("follow_up") or "", rendered)

@@ -631,6 +631,62 @@ def _ipv4_ok(value):
     return ip
 
 
+def _fields_by_name(schema):
+    found = {}
+    for section in schema.get("sections") or []:
+        for item in section.get("fields") or []:
+            name = item.get("name")
+            if name:
+                found[name] = item
+    return found
+
+
+def _control_text(values, name):
+    value = values.get(name, "")
+    if isinstance(value, (list, tuple)):
+        return ""
+    return str(value or "")
+
+
+def _is_shown(item, fields, values, stack=None):
+    controller_name = item.get("show_field") or ""
+    if not controller_name:
+        return True
+    if stack is None:
+        stack = set()
+    name = item.get("name") or ""
+    # A cycle has no hidden controller yet. The value test on the way back decides.
+    if name in stack:
+        return True
+    controller = fields.get(controller_name)
+    if controller is None:
+        return False
+    stack.add(name)
+    try:
+        controller_shown = _is_shown(controller, fields, values, stack)
+    finally:
+        stack.discard(name)
+    if not controller_shown:
+        return False
+    return _control_text(values, controller_name) == str(item.get("show_value") or "")
+
+
+def _blank_value(item):
+    if item.get("type") == "choices":
+        return []
+    return ""
+
+
+def render_values(schema, values):
+    fields = _fields_by_name(schema)
+    prepared = dict(values)
+    for item in fields.values():
+        if _is_shown(item, fields, values):
+            continue
+        prepared[item["name"]] = _blank_value(item)
+    return prepared
+
+
 def _blank_uses_stored(item, values, stored_names):
     if item.get("type") != "password" or item["name"] not in stored_names:
         return False
@@ -642,9 +698,12 @@ def _blank_uses_stored(item, values, stored_names):
 def apply_stored_secrets(schema, values, secret_map):
     filled = dict(values)
     available = set(secret_map)
+    fields = _fields_by_name(schema)
     for section in schema.get("sections", []):
         for item in section["fields"]:
             name = item["name"]
+            if not _is_shown(item, fields, filled):
+                continue
             if str(filled.get(name) or "").strip():
                 continue
             if _blank_uses_stored(item, filled, available):
@@ -677,30 +736,40 @@ def validate_values(schema, raw_values, stored_secret_names=None, stored_secret_
     stripped = {}
     for key, value in values.items():
         stripped[key] = value if isinstance(value, list) else (value.strip() if isinstance(value, str) else value)
+    fields = _fields_by_name(schema)
+    shown = {name: _is_shown(item, fields, stripped) for name, item in fields.items()}
+    # Requirement checks ignore a hidden field, so a stale value cannot make another field required.
+    basis = {}
+    for name, item in fields.items():
+        basis[name] = stripped[name] if shown[name] else _blank_value(item)
     for section in schema.get("sections", []):
         for item in section["fields"]:
             name = item["name"]
+            if not shown.get(name, True):
+                continue
             text = stripped[name]
             if item["type"] == "choices":
                 ordered, message = _checked_choices(item, text)
                 if message:
                     errors[name] = message
                 if not ordered:
-                    if _is_active(item, stripped) and not message:
+                    if _is_active(item, basis) and not message:
                         errors[name] = "Check at least one for %s." % item["label"]
                     values[name] = []
                     stripped[name] = []
+                    basis[name] = []
                     continue
                 values[name] = ordered
                 stripped[name] = ordered
+                basis[name] = ordered
                 continue
             if item["type"] == "bool" and text not in ("yes", "no"):
                 text = "no" if not text else text
             if not text:
-                if _blank_uses_stored(item, stripped, stored_secret_names):
+                if _blank_uses_stored(item, basis, stored_secret_names):
                     values[name] = ""
                     continue
-                if _is_active(item, stripped):
+                if _is_active(item, basis):
                     if item["type"] == "password" and name in stored_secret_labels:
                         errors[name] = (
                             "The stored %s is not set. Type one here, or ask an admin to set it."
@@ -746,7 +815,7 @@ def validate_values(schema, raw_values, stored_secret_names=None, stored_secret_
             elif field_type == "choice":
                 allowed = {choice["value"] for choice in item["choices"] if choice["value"] != CHOICE_PROMPT}
                 if text == CHOICE_PROMPT:
-                    if _is_active(item, stripped):
+                    if _is_active(item, basis):
                         errors[name] = "Choose one for %s." % item["label"]
                     else:
                         text = ""
@@ -765,13 +834,14 @@ def validate_values(schema, raw_values, stored_secret_names=None, stored_secret_
                     errors[name] = "This text is too long."
             values[name] = text
             stripped[name] = text
+            basis[name] = text
 
     if not errors:
         for check in schema.get("checks") or []:
             ip_name, mask_name, gateway_name = check["same_subnet"]
-            ip_text = values.get(ip_name, "")
-            mask_text = values.get(mask_name, "")
-            gateway_text = values.get(gateway_name, "")
+            ip_text = basis.get(ip_name, "")
+            mask_text = basis.get(mask_name, "")
+            gateway_text = basis.get(gateway_name, "")
             if not ip_text or not mask_text or not gateway_text:
                 continue
             try:

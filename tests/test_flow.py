@@ -57,7 +57,7 @@ def test_help_and_about_show_the_mit_notice(tmp_path, monkeypatch):
     client = TestClient(create_app())
     about = client.get("/about")
     assert about.status_code == 200
-    assert "Version 1.0" in about.text
+    assert "Version 1.0.1" in about.text
     assert "MIT License" in about.text
     assert "Copyright 2026 Ryan M Johns (@GovITInsider)" in about.text
     assert "Permission is hereby granted" in about.text
@@ -68,6 +68,8 @@ def test_help_and_about_show_the_mit_notice(tmp_path, monkeypatch):
     assert 'href="#syntax"' in help_page.text
     assert 'snmp_enabled == "yes"' in help_page.text
     assert "for line in banner_text.splitlines()" in help_page.text
+    assert "uses only the fields still on screen" in help_page.text
+    assert "A hidden yes/no field is blank, not <code>no</code>." in help_page.text
     assert "vlan.value" in help_page.text
     assert "At most 40 rows." in help_page.text
     assert "modulus 2048" not in help_page.text
@@ -276,6 +278,31 @@ def test_operator_generates_and_secrets_are_not_audited(tmp_path, monkeypatch):
     assert "ConfigKey123" not in details
 
 
+def test_hidden_fields_stay_on_the_form_and_out_of_the_paste(tmp_path, monkeypatch):
+    admin = TestClient(_app(tmp_path, monkeypatch))
+    login(admin)
+    payload = _generate_payload(admin)
+    payload["mgmt_vlan"] = "9999"
+    payload["uplink_interface"] = "not an interface"
+    result = admin.post("/generate/1", data=payload)
+    assert result.status_code == 200, result.text
+    assert 'name="mgmt_vlan" value="9999"' in result.text
+    assert 'name="uplink_interface" value="not an interface"' in result.text
+    pasted = textarea(result.text, "paste-block")
+    assert "9999" not in pasted
+    assert "not an interface" not in pasted
+    payload["csrf"] = csrf_from(result.text)
+    payload["mgmt_path"] = "svi"
+    payload["mgmt_vlan"] = "100"
+    payload["uplink_interface"] = "GigabitEthernet1/0/48"
+    again = admin.post("/generate/1", data=payload)
+    assert again.status_code == 200, again.text
+    pasted = textarea(again.text, "paste-block")
+    assert "interface Vlan100" in pasted
+    assert "GigabitEthernet1/0/48" in pasted
+    assert 'name="mgmt_vlan" value="100"' in again.text
+
+
 def test_a_dropdown_starts_on_choose_one(tmp_path, monkeypatch):
     admin = TestClient(_app(tmp_path, monkeypatch))
     login(admin)
@@ -285,7 +312,7 @@ def test_a_dropdown_starts_on_choose_one(tmp_path, monkeypatch):
     assert 'value="oob" selected' not in form.text
     help_page = admin.get("/help")
     assert "starts on <strong>Choose One</strong>" in help_page.text
-    assert "Version 1.0" in help_page.text
+    assert "Version 1.0.1" in help_page.text
     payload = _generate_payload(admin)
     payload["timezone"] = "choose"
     rejected = admin.post("/generate/1", data=payload)
