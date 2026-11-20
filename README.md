@@ -130,7 +130,7 @@ The app holds at most 10 accounts, including the first admin. An admin can add a
 
 Sign in as admin, open **Users**, and add the rest of the team. After signing in, any account can change its own password from **Password**. An admin can still reset another account from **Users** without the current password.
 
-Open **Secrets** to store up to 8 shared secrets. Each one has a name and a field name. A new database lists four unset names that match the sample template: `local_secret`, `enable_secret`, `config_key`, and `tacacs_key`. Rename them, remove them, or add others. A matching password field on the generate form shows `Stored key` in gray when that secret has a value. Leaving the field blank uses the stored value. Typing in the field overrides it for that configuration only and does not change the stored value. The template text does not contain these secrets. Removing every secret and starting the app again lists those four names once more.
+Open **Secrets** to store up to 10 shared secrets. Each one has a name and a field name. A new database lists four unset names that match the sample template: `local_secret`, `enable_secret`, `config_key`, and `tacacs_key`. Rename them, remove them, or add others. A matching password field on the generate form shows `Stored key` in gray when that secret has a value. Leaving the field blank uses the stored value. Typing in the field overrides it for that configuration only and does not change the stored value. The template text does not contain these secrets. Removing every secret and starting the app again lists those four names once more.
 
 ## Templates
 

@@ -103,7 +103,7 @@ def test_stored_secret_fills_a_blank_field_and_can_be_overridden(tmp_path, monke
     assert "Enable password" in page.text
     assert "Configuration encryption key" in page.text
     assert "TACACS key" in page.text
-    assert "4 of 8" in page.text
+    assert "4 of 10" in page.text
     assert "radius_key" not in page.text
     assert "SNMPv3 priv key" not in page.text
     added = admin.post(

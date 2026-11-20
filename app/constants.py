@@ -64,7 +64,7 @@ MONTH_LINES = (
     "Layer 1 is the only layer you can't patch, firewall, or reboot.",
     "Hope is not a cabling strategy.",
 )
-MAX_STORED_SECRETS = 8
+MAX_STORED_SECRETS = 10
 STARTER_SECRETS = (
     ("local_secret", "Admin password"),
     ("enable_secret", "Enable password"),
